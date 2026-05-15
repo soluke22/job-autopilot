@@ -1,6 +1,6 @@
 # Job Autopilot
 
-<img width="1912" height="1022" alt="image" src="https://github.com/user-attachments/assets/97179e0a-63fa-40bf-965b-8238dcde142d" />
+<img width="1912" height="992" alt="jobflow-automator" src="https://github.com/user-attachments/assets/f49adf92-c527-4158-9a63-111f7599013b" />
 
 ## Setup
 
