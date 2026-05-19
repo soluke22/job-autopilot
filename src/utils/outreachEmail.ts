@@ -1,3 +1,5 @@
+import { loadProfile, Profile } from "./config";
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -50,41 +52,74 @@ export function inferGreetingNameFromEmail(email?: string) {
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
-export function buildEmailBody(roleTitle: string, middleParagraph: string, greetingName?: string | null) {
+function buildSignatureName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) {
+    return parts[0] ?? fullName;
+  }
+
+  return `${parts[0]} ${parts[parts.length - 1][0]}`;
+}
+
+function buildSenderLinks(profile: Profile) {
+  return [
+    profile.linkedin ? { label: "LinkedIn", url: profile.linkedin } : null,
+    profile.portfolio ? { label: "Portfolio", url: profile.portfolio } : null,
+    profile.github ? { label: "GitHub", url: profile.github } : null
+  ].filter((link): link is { label: string; url: string } => Boolean(link));
+}
+
+export function buildEmailBody(
+  roleTitle: string,
+  middleParagraph: string,
+  greetingName?: string | null,
+  profile: Profile = loadProfile()
+) {
+  const senderTitle = profile.outreach?.title ?? "Software Engineer";
+  const experienceSummary = profile.outreach?.experienceSummary ?? "experience relevant to this role";
+  const signatureName = profile.outreach?.signatureName ?? buildSignatureName(profile.fullName);
+  const senderLinks = buildSenderLinks(profile);
+
   const escapedRoleTitle = escapeHtml(roleTitle);
+  const escapedFullName = escapeHtml(profile.fullName);
+  const escapedSenderTitle = escapeHtml(senderTitle);
+  const escapedExperienceSummary = escapeHtml(experienceSummary);
   const { mainParagraph, closingParagraph } = splitBodyParagraphs(middleParagraph);
   const escapedMain = escapeHtml(mainParagraph);
   const escapedClosing = escapeHtml(closingParagraph);
   const greeting = buildGreeting(greetingName ?? undefined);
   const escapedGreeting = escapeHtml(greeting);
+  const escapedSignatureName = escapeHtml(signatureName);
+  const senderLinksText = senderLinks.map((link) => `${link.label}: ${link.url}`);
+  const senderLinksHtml = senderLinks.map(
+    (link) => `${escapeHtml(link.label)}: <a href="${escapeHtml(link.url)}">${escapeHtml(link.url)}</a>`
+  );
 
   const bodyText = [
     greeting,
     "",
     "Hope you're doing well.",
     "",
-    `I'm Sudharsan Srinivasan, a Full Stack Software Engineer with 5+ years of experience working with JavaScript/TypeScript, React, Node.js, and databases (MongoDB + PostgreSQL/Supabase). I recently applied for the ${roleTitle} role and wanted to reach out directly.`,
+    `I'm ${profile.fullName}, a ${senderTitle} with ${experienceSummary}. I recently applied for the ${roleTitle} role and wanted to reach out directly.`,
     "",
     mainParagraph,
     ...(closingParagraph ? ["", closingParagraph] : []),
     "",
     "Best regards,",
-    "Sudharsan S",
+    signatureName,
     "",
-    "LinkedIn: https://www.linkedin.com/in/sudharsan-srinivasan10/",
-    "Portfolio: https://sudharsansrinivasan.com/",
-    "GitHub: https://github.com/sudharsan-ak"
+    ...senderLinksText
   ].join("\n");
 
   const bodyHtml = [
     "<div>",
     `<p>${escapedGreeting}</p>`,
     "<p>Hope you're doing well.</p>",
-    `<p>I'm <strong>Sudharsan Srinivasan</strong>, a Full Stack Software Engineer with <strong>5+ years</strong> of experience working with <strong>JavaScript/TypeScript, React, Node.js, and databases (MongoDB + PostgreSQL/Supabase)</strong>. I recently applied for the <strong>${escapedRoleTitle}</strong> role and wanted to reach out directly.</p>`,
+    `<p>I'm <strong>${escapedFullName}</strong>, a ${escapedSenderTitle} with ${escapedExperienceSummary}. I recently applied for the <strong>${escapedRoleTitle}</strong> role and wanted to reach out directly.</p>`,
     `<p>${escapedMain}</p>`,
     ...(closingParagraph ? [`<p>${escapedClosing}</p>`] : []),
-    "<p>Best regards,<br><strong>Sudharsan S</strong></p>",
-    `<p>LinkedIn: <a href="https://www.linkedin.com/in/sudharsan-srinivasan10/">https://www.linkedin.com/in/sudharsan-srinivasan10/</a><br>Portfolio: <a href="https://sudharsansrinivasan.com/">https://sudharsansrinivasan.com/</a><br>GitHub: <a href="https://github.com/sudharsan-ak">https://github.com/sudharsan-ak</a></p>`,
+    `<p>Best regards,<br><strong>${escapedSignatureName}</strong></p>`,
+    ...(senderLinksHtml.length > 0 ? [`<p>${senderLinksHtml.join("<br>")}</p>`] : []),
     "</div>"
   ].join("");
 

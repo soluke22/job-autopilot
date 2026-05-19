@@ -2,6 +2,7 @@
 import path from "path";
 import { chromium, Locator, Page } from "playwright";
 import { getRecruiterOutreachPath, readRecruiterOutreach } from "../../utils/automated/recruiterOutreach";
+import { loadProfile } from "../../utils/config";
 
 const PROFILE_READY_TIMEOUT_MS = 20000;
 const INVITE_DIALOG_TIMEOUT_MS = 10000;
@@ -105,10 +106,12 @@ function getRecruiterOutreachDiagnosticsRootPath() {
 
 function buildNote(role: string, firstName: string | null) {
   const greeting = firstName ? `Hi ${firstName},` : "Hi,";
+  const profile = loadProfile();
+  const senderFirstName = profile.firstName ?? profile.fullName.trim().split(/\s+/)[0] ?? "there";
   return [
     greeting,
     "",
-    `I'm Sudharsan and I recently applied to ${role} role and sent a quick intro over email. Would love to connect here as well.`,
+    `I'm ${senderFirstName} and I recently applied to the ${role} role and sent a quick intro over email. Would love to connect here as well.`,
     "",
     "Thanks a lot☺"
   ].join("\n");

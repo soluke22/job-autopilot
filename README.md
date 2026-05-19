@@ -11,6 +11,14 @@ npm i -D typescript ts-node @types/node
 npx playwright install
 ```
 
+Create your local profile config from the example:
+
+```powershell
+Copy-Item profile.example.json data/profile.json
+```
+
+`data/profile.json` is ignored by git. Outreach drafts read sender details from this file, including `fullName`, `linkedin`, `github`, `portfolio`, and the optional `outreach.title`, `outreach.experienceSummary`, and `outreach.signatureName` fields.
+
 ## Auth
 
 LinkedIn session:

@@ -1,0 +1,30 @@
+{
+  "fullName": "Your Name",
+  "firstName": "Your",
+  "lastName": "Name",
+  "email": "you@example.com",
+  "phone": "5555555555",
+  "location": "City, State, Country",
+  "linkedin": "https://www.linkedin.com/in/your-profile/",
+  "github": "https://github.com/your-username",
+  "portfolio": "https://your-portfolio.example.com",
+  "outreach": {
+    "title": "Full Stack Software Engineer",
+    "experienceSummary": "6+ years of experience working with JavaScript/TypeScript, React, Node.js, and databases",
+    "signatureName": "Your N"
+  },
+  "resumePdfPath": "C:\\path\\to\\resume.pdf",
+  "keywords": ["react", "typescript", "javascript", "node"],
+  "avoidPhrases": ["no sponsorship", "security clearance"],
+  "preferences": {},
+  "eeo": {},
+  "sponsorship": {},
+  "workAuthorization": {},
+  "defaults": {
+    "willNowOrInFutureRequireSponsorship": "Yes",
+    "authorizedToWork": "Yes",
+    "needsSponsorship": "Yes",
+    "startDate": "2 weeks",
+    "salaryExpectation": ""
+  }
+}

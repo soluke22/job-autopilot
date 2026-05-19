@@ -18,6 +18,12 @@ export type Profile = {
   github: string;
   portfolio: string;
 
+  outreach?: {
+    title?: string;
+    experienceSummary?: string;
+    signatureName?: string;
+  };
+
   resumePdfPath: string;
 
   keywords: string[];
