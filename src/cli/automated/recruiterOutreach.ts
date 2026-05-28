@@ -280,8 +280,8 @@ function isPendingOrFollowingAction(summary: ActionSummary) {
 }
 
 function isConnectAction(summary: ActionSummary) {
-  const combined = `${summary.text} ${summary.aria}`.toLowerCase();
-  if (!combined.includes("connect")) return false;
+  const combined = `${summary.text} ${summary.aria} ${summary.href}`.toLowerCase();
+  if (!combined.includes("connect") && !combined.includes("/preload/custom-invite/")) return false;
   return !combined.includes("message") && !combined.includes("follow") && !combined.includes("contact");
 }
 
@@ -360,6 +360,11 @@ async function findVisibleProfileHeading(page: Page) {
 }
 
 async function locateProfileHeaderRoot(page: Page) {
+  const actionRoot = await locateProfileHeaderRootFromActions(page);
+  if (actionRoot) {
+    return actionRoot;
+  }
+
   const heading = await findVisibleProfileHeading(page);
   if (!heading) {
     return null;
@@ -385,6 +390,58 @@ async function locateProfileHeaderRoot(page: Page) {
   return null;
 }
 
+async function locateProfileHeaderRootFromActions(page: Page) {
+  const actionSelectors = [
+    "a[href*='/preload/custom-invite/']",
+    "a[aria-label*='Invite' i][aria-label*='connect' i]",
+    "button[aria-label='More']",
+    "button[aria-label*='More' i][aria-expanded]"
+  ];
+
+  const deadline = Date.now() + PROFILE_READY_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    for (const selector of actionSelectors) {
+      const locators = page.locator(selector);
+      const count = await locators.count().catch(() => 0);
+
+      for (let i = 0; i < Math.min(count, 20); i += 1) {
+        const action = locators.nth(i);
+        const visible = await action.isVisible().catch(() => false);
+        if (!visible) continue;
+
+        const box = await action.boundingBox().catch(() => null);
+        if (!box || box.width < 8 || box.height < 8) continue;
+
+        // Ignore right-rail recommendations and lower page actions.
+        if (box.x > 900 || box.y > 850) continue;
+
+        const candidates = [
+          action.locator("xpath=ancestor::*[.//a[contains(@href, '/overlay/contact-info/')]][1]"),
+          action.locator("xpath=ancestor::*[.//a[contains(@href, '/messaging/compose/')]][1]"),
+          action.locator("xpath=ancestor::*[self::section or self::div][.//button or .//a][1]"),
+          action.locator("xpath=ancestor::section[1]")
+        ];
+
+        for (const candidate of candidates) {
+          const candidateVisible = await candidate.isVisible().catch(() => false);
+          if (!candidateVisible) continue;
+
+          const candidateBox = await candidate.boundingBox().catch(() => null);
+          if (!candidateBox || candidateBox.width < 200 || candidateBox.height < 80) continue;
+          if (candidateBox.x > 900 || candidateBox.y > 850) continue;
+
+          return candidate;
+        }
+      }
+    }
+
+    await delay(150);
+  }
+
+  return null;
+}
+
 async function waitForHeaderButtons(headerRoot: Locator, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
 
@@ -400,14 +457,16 @@ async function waitForHeaderButtons(headerRoot: Locator, timeoutMs = 5000) {
 
 async function findHeaderDirectConnect(headerRoot: Locator) {
   const selectors = [
-    "a[href*='/preload/custom-invite/'][aria-label*='connect' i]",
+    "a[href*='/preload/custom-invite/']",
     "a[aria-label*='invite' i][aria-label*='connect' i]",
     "button[aria-label*='invite' i][aria-label*='connect' i]",
-    "a[href*='/overlay/connect/'][aria-label*='connect' i]"
+    "a[href*='/overlay/connect/'][aria-label*='connect' i]",
+    "a:has-text('Connect')",
+    "button:has-text('Connect')"
   ];
 
   for (const selector of selectors) {
-    const match = await findVisibleAction(headerRoot, selector, () => true, 12);
+    const match = await findVisibleAction(headerRoot, selector, isConnectAction, 20);
     if (match) {
       return match;
     }
@@ -420,7 +479,8 @@ async function findHeaderMoreButton(headerRoot: Locator) {
   const selectors = [
     "button[aria-label='More']",
     "button[aria-label*='More' i][aria-expanded]",
-    "button[aria-label*='More' i]"
+    "button[aria-label*='More' i]",
+    "button:has(svg[id*='overflow'])"
   ];
 
   for (const selector of selectors) {
@@ -455,10 +515,66 @@ async function findInviteSendButton(dialog: Locator) {
   return null;
 }
 
+async function findAddNoteButton(dialog: Locator) {
+  const selectors = [
+    "button[aria-label='Add a note']",
+    "button[aria-label*='Add a note' i]",
+    "button:has-text('Add a note')"
+  ];
+
+  for (const selector of selectors) {
+    const match = await findVisibleAction(dialog, selector, (summary) => {
+      const combined = `${summary.text} ${summary.aria}`.toLowerCase();
+      return combined.includes("add a note");
+    }, 8);
+
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+async function findInviteTextarea(dialog: Locator) {
+  const candidates = [
+    dialog.locator("textarea").first(),
+    dialog.locator("[contenteditable='true']").first(),
+    dialog.locator("[role='textbox']").first()
+  ];
+
+  for (const candidate of candidates) {
+    const visible = await candidate.isVisible().catch(() => false);
+    if (!visible) continue;
+
+    const box = await candidate.boundingBox().catch(() => null);
+    if (!box || box.width < 40 || box.height < 20) continue;
+
+    return candidate;
+  }
+
+  return null;
+}
+
+async function waitForInviteTextarea(dialog: Locator, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const textarea = await findInviteTextarea(dialog);
+    if (textarea) {
+      return textarea;
+    }
+
+    await delay(150);
+  }
+
+  return null;
+}
+
 async function getInviteDialogSignals(dialog: Locator) {
   const text = ((await dialog.textContent().catch(() => "")) ?? "").toLowerCase();
-  const textareaVisible = await dialog.locator("textarea").first().isVisible().catch(() => false);
-  const addNoteVisible = await dialog.locator("button:has-text('Add a note')").first().isVisible().catch(() => false);
+  const textareaVisible = (await findInviteTextarea(dialog)) !== null;
+  const addNoteVisible = (await findAddNoteButton(dialog)) !== null;
   const sendWithoutNoteVisible = await dialog.locator("button:has-text('Send without a note')").first().isVisible().catch(() => false);
   const emailInputVisible = await dialog.locator("input[type='email'], input[inputmode='email']").first().isVisible().catch(() => false);
   const cancelVisible = await dialog.getByRole("button", { name: /cancel/i }).first().isVisible().catch(() => false);
@@ -714,17 +830,14 @@ async function fillPreparedNote(page: Page, role: string, attempt: AttemptDiagno
   attempt.dialogVisible = true;
   await delay(450);
 
-  let textarea = dialog.locator("textarea").first();
-  let textareaVisible = await textarea.isVisible().catch(() => false);
+  let textarea = await findInviteTextarea(dialog);
+  let textareaVisible = textarea !== null;
 
   if (!textareaVisible) {
     pushAttemptEvent(attempt, "Invite dialog opened without textarea. Trying Add a note.");
 
     for (let noteAttempt = 1; noteAttempt <= 2; noteAttempt += 1) {
-      const addNoteButton = await findVisibleAction(dialog, "button", (summary) => {
-        const combined = `${summary.text} ${summary.aria}`.toLowerCase();
-        return combined.includes("add a note");
-      });
+      const addNoteButton = await findAddNoteButton(dialog);
 
       if (!addNoteButton) {
         attempt.failureReason = "add-note-unavailable";
@@ -735,17 +848,21 @@ async function fillPreparedNote(page: Page, role: string, attempt: AttemptDiagno
       pushAttemptEvent(attempt, `Clicking Add a note (attempt ${noteAttempt}/2).`);
 
       try {
-        await clickLocator(addNoteButton.locator, "Add a note button");
+        await activateLocatorByDom(addNoteButton.locator, "Add a note button");
       } catch (error) {
         pushAttemptEvent(
           attempt,
-          `Add a note click failed: ${error instanceof Error ? error.message : String(error)}`
+          `Add a note DOM activation failed: ${error instanceof Error ? error.message : String(error)}. Trying Playwright click.`
         );
+        await clickLocator(addNoteButton.locator, "Add a note button").catch((clickError) => {
+          pushAttemptEvent(
+            attempt,
+            `Add a note click failed: ${clickError instanceof Error ? clickError.message : String(clickError)}`
+          );
+        });
       }
 
-      const visibleTextarea = await dialog.locator("textarea").first().waitFor({ state: "visible", timeout: 5000 })
-        .then(() => dialog.locator("textarea").first())
-        .catch(() => null);
+      const visibleTextarea = await waitForInviteTextarea(dialog, 5000);
 
       if (visibleTextarea) {
         textarea = visibleTextarea;
@@ -774,9 +891,15 @@ async function fillPreparedNote(page: Page, role: string, attempt: AttemptDiagno
   const note = buildNote(role, firstName);
 
   try {
+    if (!textarea) {
+      throw new Error("note editor was not available");
+    }
+
     await textarea.fill("");
     await textarea.fill(note);
-    const currentValue = await textarea.inputValue().catch(() => "");
+    const currentValue = await textarea.inputValue().catch(async () => {
+      return collapseWhitespace(await textarea.textContent().catch(() => ""));
+    });
 
     if (!currentValue.trim()) {
       throw new Error("textarea value remained empty after fill");
