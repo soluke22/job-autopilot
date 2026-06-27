@@ -1,15 +1,4 @@
 #!/bin/bash
 
-# Run the fullstack job
-npm run fullstack:jobs
-
-# Run the frontend job
-npm run frontend:jobs
-
-# Run the software job
-npm run software:jobs
-
-
-# Run the apply batch
-npm run apply:batch:mac
-
+# Discovery-only job radar workflow. This collects jobs, analyzes fit, and writes local digests.
+npm run jobRadar

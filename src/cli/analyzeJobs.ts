@@ -1,12 +1,27 @@
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { chromium } from "playwright";
-import { loadProfile } from "../utils/config";
-import { CsvRow, readCsv, writeCsv } from "../utils/csv";
-import { extractJobDescription } from "../utils/automated/extractJobDescription";
-import { scoreJobFit, summarizeFit } from "../utils/jobFit";
+import { readCsv, CsvRow } from "../utils/csv";
+import { extractJobDescription, StructuredJobDetails } from "../utils/automated/extractJobDescription";
+import { canonicalizeJobUrl, scoreJobFit, summarizeFit } from "../utils/jobFit";
+import {
+  JobLeadRecord,
+  ManualStatus,
+  JobRadarRecord,
+  buildRecordFromFit,
+  writeJobRadarOutputs
+} from "../utils/jobRadarOutput";
+import { loadSolomonProfile } from "../utils/solomonProfile";
+import { JobSourceType } from "../sources/types";
 
-const JOB_HEADERS = ["id", "source", "title", "company", "location", "link", "approved", "notes"];
+function getArg(name: string): string | null {
+  const hit = process.argv.find((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`));
+  if (!hit) return null;
+  if (hit.includes("=")) return hit.split("=").slice(1).join("=");
+  const idx = process.argv.indexOf(hit);
+  return process.argv[idx + 1] ?? null;
+}
 
 function sanitizeLinkedInJobUrl(raw: string) {
   const trimmed = (raw ?? "").trim();
@@ -14,175 +29,315 @@ function sanitizeLinkedInJobUrl(raw: string) {
   return match ? match[0] : trimmed;
 }
 
+function preferredJobsPath() {
+  const csvArg = getArg("csv");
+  if (csvArg) return path.resolve(process.cwd(), csvArg);
+
+  const rawJobsPath = path.join(process.cwd(), "data", "jobs-raw", "jobs.csv");
+  if (fs.existsSync(rawJobsPath)) return rawJobsPath;
+
+  return path.join(process.cwd(), "data", "jobs.csv");
+}
+
 function getStoragePath() {
   const combinedPath = path.join(process.cwd(), "storage", "combined.json");
-  if (fs.existsSync(combinedPath)) {
-    return combinedPath;
-  }
-
+  if (fs.existsSync(combinedPath)) return combinedPath;
   return path.join(process.cwd(), "storage", "linkedin.json");
 }
 
-function getOutputPath(fileName: string) {
-  return path.join(process.cwd(), "data", fileName);
+function ensureDir(dir: string) {
+  fs.mkdirSync(dir, { recursive: true });
 }
 
-function getAnalyzedDataDir() {
-  return path.join(process.cwd(), "data", "analyzed-jobs");
+function slugify(value: string) {
+  return (value || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70);
 }
 
-function getAnalyzedDataPath() {
-  return path.join(getAnalyzedDataDir(), "JDInfo.txt");
+function shortHash(value: string) {
+  return crypto.createHash("sha1").update(value).digest("hex").slice(0, 8);
 }
 
-function appendFitNote(row: CsvRow, fitSummary: string) {
-  const existing = (row.notes ?? "").trim();
-  return existing ? `${existing} | ${fitSummary}` : fitSummary;
+function fullHash(value: string) {
+  return crypto.createHash("sha1").update(value).digest("hex");
 }
 
-function resetAnalyzedDataFile(filePath: string) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, "", "utf-8");
-}
-
-type AnalyzedJobEntry = {
+function writeRawJobDescription(input: {
   company: string;
   title: string;
-  link: string;
+  url: string;
   descriptionText: string;
-  bucket: "strong" | "partial" | "skip";
-  score: number;
-};
-
-function formatAnalyzedJobBlock(details: AnalyzedJobEntry) {
-  return [
-    `Company: ${details.company || "Unknown company"}`,
-    `Role: ${details.title || "Unknown title"}`,
-    `Link: ${details.link || ""}`,
+  generatedAt: string;
+}) {
+  const jdDir = path.join(process.cwd(), "data", "jd-text");
+  ensureDir(jdDir);
+  const fileName = `${slugify(`${input.company}-${input.title}`)}-${shortHash(input.url || input.descriptionText)}.txt`;
+  const filePath = path.join(jdDir, fileName);
+  const body = [
+    `Company: ${input.company || "Unknown company"}`,
+    `Role: ${input.title || "Unknown title"}`,
+    `URL: ${input.url || ""}`,
+    `Collected: ${input.generatedAt}`,
     "",
-    "JD",
-    details.descriptionText || "",
-    "",
-    ""
+    input.descriptionText || ""
   ].join("\n");
+  fs.writeFileSync(filePath, body, "utf8");
+  return path.relative(process.cwd(), filePath).replace(/\\/g, "/");
 }
 
-function writeAnalyzedJobs(filePath: string, jobs: AnalyzedJobEntry[]) {
-  const sections: Array<{ label: string; bucket: AnalyzedJobEntry["bucket"] }> = [
-    { label: "Strong fits:", bucket: "strong" },
-    { label: "Partial fits:", bucket: "partial" },
-    { label: "Skip fits:", bucket: "skip" }
-  ];
+function fallbackDetails(row: CsvRow): StructuredJobDetails {
+  return {
+    title: row.title ?? "",
+    company: row.company ?? "",
+    location: row.location ?? "",
+    descriptionText: row.notes ?? "",
+    requiredSkills: [],
+    preferredSkills: [],
+    coreResponsibilities: [],
+    seniority: "",
+    domainKeywords: []
+  };
+}
 
-  const content = sections
-    .map(({ label, bucket }) => {
-      const sectionJobs = jobs
-        .filter((job) => job.bucket === bucket)
-        .sort((left, right) => right.score - left.score);
+function readManualLeads(): JobLeadRecord[] {
+  const leadsPath = path.join(process.cwd(), "data", "leads", "job-leads.json");
+  const legacyPath = path.join(process.cwd(), "data", "jobs-raw", "manual-leads.json");
+  const targetPath = fs.existsSync(leadsPath) ? leadsPath : legacyPath;
+  if (!fs.existsSync(targetPath)) return [];
+  const parsed = JSON.parse(fs.readFileSync(targetPath, "utf8"));
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((lead) => lead && typeof lead.company === "string")
+    .map((lead, index) => ({
+      leadId: lead.leadId ?? `lead-${index + 1}`,
+      company: lead.company,
+      signalSource: lead.signalSource ?? "manual-public-url",
+      signalUrl: lead.signalUrl ?? lead.signalSource ?? "",
+      signalType: lead.signalType ?? "manual_signal",
+      whyWorthWatching: lead.whyWorthWatching ?? lead.whyWatch ?? "",
+      whyWatch: lead.whyWatch ?? lead.whyWorthWatching ?? "",
+      likelyRoleFamily: lead.likelyRoleFamily ?? "frontend/product UI",
+      suggestedSearchTerms: lead.suggestedSearchTerms ?? ["frontend engineer", "react", "typescript"],
+      suggestedNetworkingTarget: lead.suggestedNetworkingTarget ?? "frontend engineering manager or recruiter",
+      confidence: lead.confidence ?? "medium",
+      applyable: false,
+      notes: lead.notes ?? ""
+    })) as JobLeadRecord[];
+}
 
-      const blocks = sectionJobs.map((job) => formatAnalyzedJobBlock(job)).join("");
-      return `${label}\n\n${blocks}`;
-    })
-    .join("\n");
+function getSourceType(row: CsvRow): JobSourceType {
+  const sourceType = row.sourceType as JobSourceType | undefined;
+  if (sourceType) return sourceType;
+  const source = (row.source || "").toLowerCase();
+  if (source.includes("linkedin")) return "linkedIn";
+  if (source.includes("greenhouse")) return "greenhouse";
+  if (source.includes("lever")) return "lever";
+  if (source.includes("ashby")) return "ashby";
+  if (source.includes("workday")) return "workday";
+  if (source.includes("manual")) return "manualUrl";
+  return "aggregator";
+}
 
-  fs.writeFileSync(filePath, content, "utf-8");
+function getSourceConfidence(row: CsvRow): "high" | "medium" | "low" {
+  if (row.sourceConfidence === "high" || row.sourceConfidence === "medium" || row.sourceConfidence === "low") {
+    return row.sourceConfidence;
+  }
+  const sourceType = getSourceType(row);
+  if (sourceType === "greenhouse" || sourceType === "lever" || sourceType === "ashby" || sourceType === "companyCareerPage") {
+    return "high";
+  }
+  if (sourceType === "aggregator" || sourceType === "remoteJobBoard") return "low";
+  return "medium";
+}
+
+function getManualStatus(row: CsvRow): ManualStatus {
+  const value = row.manualStatus as ManualStatus | undefined;
+  const allowed: ManualStatus[] = ["unreviewed", "apply_priority", "research_first", "network_first", "skip_after_review"];
+  return value && allowed.includes(value) ? value : "unreviewed";
+}
+
+function dedupeRecords(records: JobRadarRecord[]) {
+  const byKey = new Map<string, JobRadarRecord>();
+  for (const record of records) {
+    const key = record.dedupeKey || `record:${record.id}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...record, duplicateCount: 0, duplicateSourceUrls: [] });
+      continue;
+    }
+
+    const duplicateUrls = [
+      ...(existing.duplicateSourceUrls ?? []),
+      record.sourceUrl,
+      record.applyUrl
+    ].filter(Boolean);
+    const duplicateCount = (existing.duplicateCount ?? 0) + 1;
+    const winner = record.score > existing.score ? record : existing;
+    byKey.set(key, {
+      ...winner,
+      duplicateCount,
+      duplicateSourceUrls: Array.from(new Set(duplicateUrls))
+    });
+  }
+  return [...byKey.values()];
 }
 
 async function main() {
-  const profile = loadProfile();
-  const jobsPath = getOutputPath("jobs.csv");
-  const strongPath = getOutputPath("jobsStrong.csv");
-  const partialPath = getOutputPath("jobsMedium.csv");
-  const skipPath = getOutputPath("jobsSkip.csv");
-  const analyzedDataPath = getAnalyzedDataPath();
+  const profile = loadSolomonProfile();
+  const jobsPath = preferredJobsPath();
+  const generatedAt = new Date().toISOString();
 
   if (!fs.existsSync(jobsPath)) {
-    throw new Error(`Missing CSV: ${jobsPath}`);
+    throw new Error(`Missing jobs CSV: ${jobsPath}. Run npm run collectJobs first, or pass --csv=path/to/jobs.csv.`);
   }
 
-  const storagePath = getStoragePath();
-  if (!fs.existsSync(storagePath)) {
-    throw new Error(`LinkedIn session not found. Run: npm run authLinkedIn`);
-  }
-
-  const rows = readCsv(jobsPath);
+  const requestedLimit = Math.max(0, Number.parseInt(getArg("limit") ?? getArg("count") ?? "0", 10) || 0);
+  const rows = requestedLimit > 0 ? readCsv(jobsPath).slice(0, requestedLimit) : readCsv(jobsPath);
   if (rows.length === 0) {
-    writeCsv(strongPath, [], JOB_HEADERS);
-    writeCsv(partialPath, [], JOB_HEADERS);
-    writeCsv(skipPath, [], JOB_HEADERS);
-    resetAnalyzedDataFile(analyzedDataPath);
-    console.log("No jobs found in data/jobs.csv.");
+    writeJobRadarOutputs(
+      {
+        generatedAt,
+        profileName: profile.candidate.name,
+        sourceFile: jobsPath,
+        jobs: [],
+        leads: readManualLeads()
+      },
+      profile
+    );
+    console.log("No jobs found. Empty radar outputs were written.");
     return;
   }
 
-  resetAnalyzedDataFile(analyzedDataPath);
-
+  const storagePath = getStoragePath();
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ storageState: storagePath });
+  const contextOptions = fs.existsSync(storagePath) ? { storageState: storagePath } : {};
+  if (!fs.existsSync(storagePath)) {
+    console.log("No LinkedIn storage state found. Public ATS URLs can still be analyzed; LinkedIn URLs may require auth.");
+  }
+  const context = await browser.newContext(contextOptions);
+  const records: JobRadarRecord[] = [];
 
-  const strongMatches: Array<{ row: CsvRow; score: number }> = [];
-  const partialMatches: Array<{ row: CsvRow; score: number }> = [];
-  const skippedMatches: Array<{ row: CsvRow; score: number }> = [];
-  const analyzedJobs: AnalyzedJobEntry[] = [];
-
-  console.log(`Analyzing ${rows.length} job(s) against your JS/TS + Meteor/React full-stack profile...`);
-  console.log("Headless mode enabled. Progress will be printed here for each job.\n");
+  console.log(`Analyzing ${rows.length} job(s) for ${profile.candidate.name}.`);
+  console.log("Read-only mode: pages are opened for text extraction only; no apply buttons, forms, uploads, or messages.\n");
 
   for (const [index, row] of rows.entries()) {
     const page = await context.newPage();
-    const jobUrl = sanitizeLinkedInJobUrl(row.link);
+    const sourceUrl = sanitizeLinkedInJobUrl(row.sourceUrl || row.link || row.applyUrl || "");
+    const applyUrl = canonicalizeJobUrl(row.applyUrl || row.link || sourceUrl);
+    const sourceName = row.sourceName || row.source || "manual";
+    const sourceType = getSourceType(row);
+    const sourceConfidence = getSourceConfidence(row);
+    const dateFound = row.dateFound || generatedAt.slice(0, 10);
+    const manualStatus = getManualStatus(row);
 
     try {
       console.log(`[${index + 1}/${rows.length}] ${row.title || "Unknown title"} @ ${row.company || "Unknown company"}`);
-      console.log(` -> opening ${jobUrl}`);
-      await page.goto(jobUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
-      await page.waitForTimeout(1800);
+      console.log(` -> opening ${sourceUrl}`);
+      await page.goto(sourceUrl, { waitUntil: "domcontentloaded", timeout: 90000 });
+      await page.waitForTimeout(1500);
 
-      console.log(" -> extracting title/company/location/about-the-job from rendered DOM");
       const details = await extractJobDescription(page);
-      console.log(" -> scoring fit");
+      const title = details.title || row.title || "";
+      const collectedCompany = row.company || "";
+      const extractedCompanyFromJd = details.company || "";
+      const location = details.location || row.location || "";
       const fit = scoreJobFit(profile, {
         ...details,
         fallbackTitle: row.title,
-        fallbackLocation: row.location || details.location
+        fallbackCompany: row.company,
+        fallbackLocation: row.location,
+        collectedCompany,
+        extractedCompanyFromJd,
+        source: sourceName,
+        sourceType,
+        sourceUrl,
+        applyUrl
       });
-
-      const updatedRow: CsvRow = {
-        ...row,
-        link: jobUrl,
-        notes: appendFitNote(row, summarizeFit(fit))
-      };
-
-      if (fit.bucket === "strong") {
-        strongMatches.push({ row: updatedRow, score: fit.score });
-      } else if (fit.bucket === "partial") {
-        partialMatches.push({ row: updatedRow, score: fit.score });
-      } else {
-        skippedMatches.push({ row: updatedRow, score: fit.score });
-      }
-
-      analyzedJobs.push({
-        company: details.company || row.company,
-        title: details.title || row.title,
-        link: jobUrl,
+      const jdTextPath = writeRawJobDescription({
+        company: fit.companyVerification.canonicalCompany,
+        title,
+        url: sourceUrl,
         descriptionText: details.descriptionText,
-        bucket: fit.bucket,
-        score: fit.score
+        generatedAt
       });
+      const jobDescriptionHash = fullHash(details.descriptionText || sourceUrl || `${row.title}|${row.company}`);
 
-      console.log(` -> ${fit.bucket.toUpperCase()} (${fit.score})`);
-      console.log(" -> closed analysis tab");
+      records.push(
+        buildRecordFromFit({
+          id: row.id || String(index + 1),
+          source: sourceName,
+          sourceName,
+          sourceType,
+          title,
+          company: fit.companyVerification.canonicalCompany,
+          collectedCompany,
+          extractedCompanyFromJd,
+          location,
+          locationRaw: location,
+          dateFound,
+          datePosted: row.datePosted || "",
+          jobDescriptionText: details.descriptionText,
+          jobDescriptionHash,
+          jdTextPath,
+          sourceConfidence,
+          extractionConfidence: details.descriptionText ? "high" : "medium",
+          manualStatus,
+          fit
+        })
+      );
+
+      console.log(` -> ${fit.bucket.toUpperCase()} (${fit.score}) ${summarizeFit(fit)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log(` -> PARTIAL (fetch/extract issue: ${message})`);
-      partialMatches.push({
-        row: {
-          ...row,
-          link: jobUrl,
-          notes: appendFitNote(row, `fit=30 partial | extraction issue ${message}`)
-        },
-        score: 30
+      console.log(` -> extraction issue, scoring from collected row only: ${message}`);
+      const details = fallbackDetails(row);
+      const fit = scoreJobFit(profile, {
+        ...details,
+        fallbackTitle: row.title,
+        fallbackCompany: row.company,
+        fallbackLocation: row.location,
+        collectedCompany: row.company,
+        extractedCompanyFromJd: "",
+        source: sourceName,
+        sourceType,
+        sourceUrl,
+        applyUrl
       });
+      fit.risksGaps = [...fit.risksGaps, `extraction issue: ${message}`];
+      fit.manualReviewFlags = [...fit.manualReviewFlags, "JD extraction failed"];
+      const jdTextPath = writeRawJobDescription({
+        company: row.company || "",
+        title: row.title || "",
+        url: sourceUrl,
+        descriptionText: `JD extraction failed: ${message}`,
+        generatedAt
+      });
+      records.push(
+        buildRecordFromFit({
+          id: row.id || String(index + 1),
+          source: sourceName,
+          sourceName,
+          sourceType,
+          title: row.title || "",
+          company: fit.companyVerification.canonicalCompany,
+          collectedCompany: row.company || "",
+          extractedCompanyFromJd: "",
+          location: row.location || "",
+          locationRaw: row.location || "",
+          dateFound,
+          datePosted: row.datePosted || "",
+          jobDescriptionText: `JD extraction failed: ${message}`,
+          jobDescriptionHash: fullHash(`${sourceUrl}|${message}`),
+          jdTextPath,
+          sourceConfidence,
+          extractionConfidence: "low",
+          manualStatus,
+          fit
+        })
+      );
     } finally {
       await page.close().catch(() => {});
     }
@@ -190,20 +345,32 @@ async function main() {
 
   await browser.close();
 
-  const sortByScoreDesc = (items: Array<{ row: CsvRow; score: number }>) =>
-    items.sort((left, right) => right.score - left.score).map((item) => item.row);
+  const deduped = dedupeRecords(records);
+  writeJobRadarOutputs(
+    {
+      generatedAt,
+      profileName: profile.candidate.name,
+      sourceFile: jobsPath,
+      jobs: deduped,
+      leads: readManualLeads()
+    },
+    profile
+  );
 
-  writeCsv(strongPath, sortByScoreDesc(strongMatches), JOB_HEADERS);
-  writeCsv(partialPath, sortByScoreDesc(partialMatches), JOB_HEADERS);
-  writeCsv(skipPath, sortByScoreDesc(skippedMatches), JOB_HEADERS);
-  writeAnalyzedJobs(analyzedDataPath, analyzedJobs);
+  const counts = deduped.reduce<Record<string, number>>((acc, job) => {
+    acc[job.fitBucket] = (acc[job.fitBucket] ?? 0) + 1;
+    return acc;
+  }, {});
 
   console.log("");
-  console.log(`Original data/jobs.csv left unchanged: ${rows.length}`);
-  console.log(`Strong matches written to data/jobsStrong.csv: ${strongMatches.length}`);
-  console.log(`Medium matches written to data/jobsMedium.csv: ${partialMatches.length}`);
-  console.log(`Skipped matches written to data/jobsSkip.csv: ${skippedMatches.length}`);
-  console.log(`Analyzed job text written to data/analyzed-jobs/JDInfo.txt`);
+  console.log(`Analyzed rows: ${records.length}`);
+  console.log(`Deduped jobs: ${deduped.length}`);
+  console.log(`Strong: ${counts.strong ?? 0}`);
+  console.log(`Good: ${counts.good ?? 0}`);
+  console.log(`Possible: ${counts.possible ?? 0}`);
+  console.log(`Stretch: ${counts.stretch ?? 0}`);
+  console.log(`Skip: ${counts.skip ?? 0}`);
+  console.log("Outputs written under data/jobs-analyzed, data/job-digests, and data/jd-text.");
 }
 
 main().catch((error) => {

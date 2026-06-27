@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { authorizeGmail } from "./gmailAuth";
+import { assertGmailDraftsAllowed } from "./safety";
 
 type CreateDraftInput = {
   to?: string;
@@ -17,6 +18,7 @@ function toBase64Url(value: string) {
 }
 
 export async function createGmailDraft(input: CreateDraftInput) {
+  assertGmailDraftsAllowed();
   const auth = await authorizeGmail();
   const gmail = google.gmail({ version: "v1", auth: auth as any });
   const boundary = "job-autopilot-boundary";

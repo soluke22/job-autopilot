@@ -8,6 +8,7 @@ import { readCsv } from "../utils/csv";
 import { autofillAshby } from "../apply/ashby_mac";
 import { autofillGreenhouse } from "../apply/greenhouse";
 import { autofillLever } from "../apply/lever";
+import { assertApplyAutomationAllowed } from "../utils/safety";
 
 function getArg(name: string): string | null {
   const hit = process.argv.find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
@@ -277,6 +278,7 @@ function recordUnknownJob(filePath: string, job: UnknownJob) {
 }
 
 async function main() {
+  assertApplyAutomationAllowed();
   const profile = loadProfile();
   let ashbyCount = 0;
   let greenhouseCount = 0;

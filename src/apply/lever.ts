@@ -1,5 +1,6 @@
 import { Page } from "playwright";
 import { Profile } from "../utils/config";
+import { assertApplyAutomationAllowed } from "../utils/safety";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -381,6 +382,7 @@ function toLeverApplyUrl(currentUrl: string): string | null {
 }
 
 export async function autofillLever(page: Page, profile: Profile) {
+  assertApplyAutomationAllowed();
   const applyUrl = toLeverApplyUrl(page.url());
   if (applyUrl && applyUrl !== page.url()) {
     await page.goto(applyUrl, { waitUntil: "domcontentloaded" });

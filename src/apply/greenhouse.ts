@@ -1,5 +1,6 @@
 import { Page } from "playwright";
 import { Profile } from "../utils/config";
+import { assertApplyAutomationAllowed } from "../utils/safety";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -576,6 +577,7 @@ async function defaultYesForYesNoSelects(page: Page) {
 }
 
 export async function autofillGreenhouse(page: Page, profile: Profile) {
+  assertApplyAutomationAllowed();
   await page.waitForTimeout(1200);
   if (await myGreenhouseToastVisible(page)) {
     console.log("[Greenhouse] MyGreenhouse already autofilled; skipping manual fill.");

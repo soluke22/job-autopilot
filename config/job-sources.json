@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "defaultRateLimitConfig": {
+    "minDelayMs": 1500,
+    "maxRequestsPerMinute": 20
+  },
+  "sources": [
+    {
+      "sourceName": "linkedin-frontend-react-typescript",
+      "sourceType": "linkedIn",
+      "enabled": true,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "searchUrls": [
+        "https://www.linkedin.com/jobs/search/?keywords=Frontend%20Engineer%20React%20TypeScript&location=United%20States&f_JT=F&sortBy=DD",
+        "https://www.linkedin.com/jobs/search/?keywords=Software%20Engineer%20Frontend%20React%20TypeScript&location=United%20States&f_JT=F&sortBy=DD"
+      ],
+      "jobUrls": [],
+      "notes": "Use npm run collectLinkedIn with one search URL at a time. LinkedIn collection remains read-only and does not click Easy Apply."
+    },
+    {
+      "sourceName": "manual-public-url-imports",
+      "sourceType": "manualUrl",
+      "enabled": true,
+      "supportsSearch": false,
+      "supportsUrlImport": true,
+      "jobUrls": [],
+      "notes": "Add public JD URLs here or use data/jobs-raw/manual-urls.txt."
+    },
+    {
+      "sourceName": "target-greenhouse-boards",
+      "sourceType": "greenhouse",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "boardUrls": [
+        "https://boards.greenhouse.io/github",
+        "https://boards.greenhouse.io/pinterest"
+      ],
+      "jobUrls": [],
+      "notes": "Prefer public Greenhouse JD URLs. Board crawling should stay small, polite, and source-specific."
+    },
+    {
+      "sourceName": "target-lever-boards",
+      "sourceType": "lever",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "boardUrls": [
+        "https://jobs.lever.co/spotify",
+        "https://jobs.lever.co/figma"
+      ],
+      "jobUrls": [],
+      "notes": "Prefer public Lever JD URLs. Keep live collection opt-in and limited."
+    },
+    {
+      "sourceName": "target-ashby-boards",
+      "sourceType": "ashby",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "boardUrls": [
+        "https://jobs.ashbyhq.com/linear",
+        "https://jobs.ashbyhq.com/vercel"
+      ],
+      "jobUrls": [],
+      "notes": "Prefer public Ashby JD URLs. Avoid login-gated or brittle flows."
+    },
+    {
+      "sourceName": "target-workday-pages",
+      "sourceType": "workday",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "boardUrls": [],
+      "jobUrls": [],
+      "notes": "Workday pages vary heavily. Add direct public JD URLs where possible."
+    },
+    {
+      "sourceName": "remote-boards-sundayy-remotehunter",
+      "sourceType": "remoteJobBoard",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "searchUrls": [
+        "https://sundayy.com/",
+        "https://remotehunter.com/"
+      ],
+      "jobUrls": [],
+      "notes": "Use public JD URLs from Sundayy, RemoteHunter, or similar boards when accessible. Preserve the board as source attribution."
+    },
+    {
+      "sourceName": "aggregator-repost-imports",
+      "sourceType": "aggregator",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "jobUrls": [],
+      "notes": "Aggregator jobs must preserve aggregator source separately; canonical company comes from JD body and apply URL when confidence is high."
+    },
+    {
+      "sourceName": "target-company-careers",
+      "sourceType": "companyCareerPage",
+      "enabled": false,
+      "supportsSearch": true,
+      "supportsUrlImport": true,
+      "targetCompanies": [
+        "Disney",
+        "ESPN",
+        "GitHub",
+        "Figma",
+        "The Washington Post",
+        "NPR",
+        "SiriusXM"
+      ],
+      "boardUrls": [],
+      "jobUrls": [],
+      "notes": "Company career pages should produce jobs only when a real JD URL exists; otherwise create hidden-market leads."
+    },
+    {
+      "sourceName": "hidden-market-leads",
+      "sourceType": "hiddenMarketLead",
+      "enabled": true,
+      "supportsSearch": false,
+      "supportsUrlImport": false,
+      "leadUrls": [],
+      "notes": "Funding, team-growth, launch, engineering-blog, and hiring-post signals become non-applyable leads."
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import {
   readManualOutreachInput
 } from "../../utils/manual/manualOutreach";
 import { buildEmailBody, buildSubject, inferGreetingNameFromEmail } from "../../utils/outreachEmail";
+import { assertGmailDraftsAllowed } from "../../utils/safety";
 
 const BATCH_SIZE = 3;
 
@@ -15,6 +16,7 @@ export type ManualDraftRunResult = {
 };
 
 export async function createManualOutreachDraftsForJobs(jobs: ManualOutreachBlock[]) {
+  assertGmailDraftsAllowed();
   let successCount = 0;
   let failureCount = 0;
   const tasks = jobs.flatMap((job, jobIndex) =>

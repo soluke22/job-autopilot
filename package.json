@@ -1,29 +1,41 @@
 {
   "name": "job-autopilot",
   "version": "1.0.0",
-  "description": "Steps to follow: npm init -y npm i playwright dotenv npm i -D typescript ts-node @types/node npx playwright install",
+  "description": "Human-in-the-loop job discovery, JD collection, scoring, dedupe, and digest generation for Solomon Lucas-Thornton.",
   "main": "index.js",
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "ts-node src/tests/jobRadar.test.ts",
     "authLinkedIn": "ts-node src/cli/authLinkedIn.ts",
     "authGreenhouse": "ts-node src/cli/authGreenhouse.ts",
     "authGmail": "ts-node src/cli/authGmail.ts",
+    "discoverJds": "ts-node src/cli/discoverJds.ts",
+    "collectJobs": "ts-node src/cli/collectLinkedIn.ts",
     "collectLinkedIn": "ts-node src/cli/collectLinkedIn.ts",
+    "collectRemoteBoards": "ts-node src/cli/collectRemoteBoards.ts",
+    "collectCompanyBoards": "ts-node src/cli/collectCompanyBoards.ts",
+    "collectManualUrls": "ts-node src/cli/collectManualUrls.ts",
+    "collectHiddenMarketLeads": "ts-node src/cli/collectHiddenMarketLeads.ts",
     "analyzeJobs": "ts-node src/cli/analyzeJobs.ts",
-    "enrichLinkedInCsvEmails": "ts-node src/cli/enrichLinkedInCsvEmails.ts",
-    "createOutreachDrafts": "ts-node src/cli/automated/createOutreachDrafts.ts",
-    "prepareManualOutreach": "ts-node src/cli/manual/prepareManualOutreach.ts",
-    "draftEmails": "ts-node src/cli/manual/createManualOutreachDrafts.ts",
-    "watchManualOutreach": "ts-node src/cli/manual/watchManualOutreach.ts",
-    "recruiterOutreach": "ts-node src/cli/automated/recruiterOutreach.ts",
-    "applyBatchWindows": "ts-node src/cli/applyBatch_windows.ts",
-    "applyBatchMac": "ts-node src/cli/applyBatch_mac.ts",
+    "analyzeJds": "ts-node src/cli/analyzeJobs.ts",
+    "generateJobDigest": "ts-node src/cli/generateJobDigest.ts",
+    "exportForTailoring": "ts-node src/cli/exportForTailoring.ts",
+    "jobRadar": "ts-node src/cli/jobRadar.ts",
     "openUnknownJobs": "ts-node src/cli/openUnknownJobs.ts",
     "unknownJobsUI": "ts-node src/cli/unknownJobsUi.ts",
     "controllerUI": "ts-node src/cli/controllerUi.ts",
-    "frontendJobs": "npm run collectLinkedIn -- --count=20 --url \"https://www.linkedin.com/jobs/search/?f_E=3%%2C4&f_F=it%%2Ceng&f_JT=F&f_T=9%%2C39%%2C25201%%2C3172%%2C1176&f_TPR=r86400&geoId=103644278&keywords=Frontend%%20Engineer%%20JavaScript%%20NOT%%20(%%22Easy%%20Apply%%22%%20OR%%20%%22Easy%%20Apply%%20only%%22%%20OR%%20%%22LinkedIn%%20Easy%%20Apply%%22%%20OR%%20%%226%%2B%%20years%%22%%20OR%%20%%227%%2B%%20years%%22%%20OR%%20%%228%%2B%%20years%%22%%20OR%%20%%2210%%2B%%20years%%22)&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true&sortBy=DD\"",
-    "softwareJobs": "npm run collectLinkedIn -- --count=20 --url \"https://www.linkedin.com/jobs/search/?f_E=3%%2C4&f_F=it%%2Ceng&f_JT=F&f_T=9%%2C39%%2C25201%%2C3172%%2C1176&f_TPR=r86400&geoId=103644278&keywords=Software%%20Engineer%%20JavaScript%%20NOT%%20(%%22Easy%%20Apply%%22%%20OR%%20%%22Easy%%20Apply%%20only%%22%%20OR%%20%%22LinkedIn%%20Easy%%20Apply%%22%%20OR%%20%%226%%2B%%20years%%22%%20OR%%20%%227%%2B%%20years%%22%%20OR%%20%%228%%2B%%20years%%22%%20OR%%20%%2210%%2B%%20years%%22)&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON&refresh=true&sortBy=DD\"",
-    "fullstackJobs": "npm run collectLinkedIn -- --count=20 --url \"https://www.linkedin.com/jobs/search/?f_E=3%%2C4&f_F=it%%2Ceng&f_JT=F&f_T=9%%2C39%%2C25201%%2C3172%%2C1176&f_TPR=r86400&geoId=103644278&keywords=Full%%20Stack%%20Engineer%%20NOT%%20(%%22Easy%%20Apply%%22%%20OR%%20%%22Easy%%20Apply%%22%%20only%%22%%20OR%%20%%22LinkedIn%%20Easy%%20Apply%%22%%20OR%%20%%226%%2B%%20years%%22%%20OR%%20%%227%%2B%%20years%%22%%20OR%%20%%228%%2B%%20years%%22%%20OR%%20%%2210%%2B%%20years%%22)&origin=JOBS_HOME_KEYWORD_HISTORY\"",
-    "start:sh": "npm run fullstackJobs && npm run frontendJobs && npm run softwareJobs"
+    "frontendJobs": "npm run collectJobs -- --count=20 --url \"https://www.linkedin.com/jobs/search/?keywords=Frontend%%20Engineer%%20React%%20TypeScript&location=United%%20States&f_JT=F&sortBy=DD\"",
+    "softwareJobs": "npm run collectJobs -- --count=20 --url \"https://www.linkedin.com/jobs/search/?keywords=Software%%20Engineer%%20Frontend%%20React%%20TypeScript&location=United%%20States&f_JT=F&sortBy=DD\"",
+    "fullstackFrontendJobs": "npm run collectJobs -- --count=20 --url \"https://www.linkedin.com/jobs/search/?keywords=Full%%20Stack%%20Engineer%%20Frontend%%20React%%20TypeScript&location=United%%20States&f_JT=F&sortBy=DD\"",
+    "start:sh": "npm run jobRadar",
+    "archive:applyBatchWindows": "ts-node src/cli/applyBatch_windows.ts",
+    "archive:applyBatchMac": "ts-node src/cli/applyBatch_mac.ts",
+    "archive:enrichLinkedInCsvEmails": "ts-node src/cli/enrichLinkedInCsvEmails.ts",
+    "archive:createOutreachDrafts": "ts-node src/cli/automated/createOutreachDrafts.ts",
+    "archive:prepareManualOutreach": "ts-node src/cli/manual/prepareManualOutreach.ts",
+    "archive:draftEmails": "ts-node src/cli/manual/createManualOutreachDrafts.ts",
+    "archive:watchManualOutreach": "ts-node src/cli/manual/watchManualOutreach.ts",
+    "archive:recruiterOutreach": "ts-node src/cli/automated/recruiterOutreach.ts"
   },
   "keywords": [],
   "author": "",
@@ -49,5 +61,8 @@
   "bugs": {
     "url": "https://github.com/sudharsan-ak/job-autopilot/issues"
   },
-  "homepage": "https://github.com/sudharsan-ak/job-autopilot#readme"
+  "homepage": "https://github.com/sudharsan-ak/job-autopilot#readme",
+  "directories": {
+    "doc": "docs"
+  }
 }

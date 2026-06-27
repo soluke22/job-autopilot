@@ -1,43 +1,25 @@
-# Outreach
+# Archived Outreach
 
-Automated outreach drafts:
+Normal Job Radar workflows do not send emails, create Gmail drafts, message recruiters, or send LinkedIn invitations.
 
-```powershell
-npm run createOutreachDrafts
-```
-
-Manual outreach:
+Archived Gmail draft workflows require:
 
 ```powershell
-npm run prepareManualOutreach
-npm run draftEmails
+--i-understand-this-will-create-gmail-drafts
 ```
 
-Manual outreach watcher:
+Archived LinkedIn recruiter messaging requires:
 
 ```powershell
-npm run watchManualOutreach
-npm run watchManualOutreach -- --intervalMinutes=3
+--i-understand-this-will-message-recruiters
 ```
 
-Recruiter outreach:
+Examples:
 
 ```powershell
-npm run recruiterOutreach
+npm run archive:createOutreachDrafts -- --i-understand-this-will-create-gmail-drafts
+npm run archive:draftEmails -- --i-understand-this-will-create-gmail-drafts
+npm run archive:recruiterOutreach -- --i-understand-this-will-message-recruiters
 ```
 
-Show detailed Playwright flow diagnostics in the terminal:
-
-```powershell
-npm run recruiterOutreach -- --verbose
-```
-
-# Gmail CSV Enrichment
-
-Enrich a recruiter CSV by finding recipient emails from your Gmail Sent mail:
-
-```powershell
-npm run authGmail
-npm run enrichLinkedInCsvEmails -- --csv "path/to/your.csv"
-npm run enrichLinkedInCsvEmails -- --csv "path/to/your.csv" --out "path/to/output.csv"
-```
+Do not run archived outreach commands unless Solomon explicitly approves a separate future workflow.

@@ -1,33 +1,12 @@
-# Applying to Jobs
+# Archived Apply Automation
+
+Normal Job Radar workflows do not apply to jobs, click final apply buttons, upload resumes, or fill application forms.
+
+The old apply scripts are retained only as archived code. They are not exposed as normal commands and fail unless the explicit flag below is passed:
 
 ```powershell
-npm run applyBatchWindows
-npm run applyBatchMac
+npm run archive:applyBatchWindows -- --i-understand-this-will-apply
+npm run archive:applyBatchMac -- --i-understand-this-will-apply
 ```
 
-Run against a specific CSV bucket:
-
-```powershell
-npm run applyBatchWindows -- --csv=data/jobsStrong.csv
-npm run applyBatchMac -- --csv=data/jobsStrong.csv --count=5
-```
-
-Controls while running:
-
-- Pause: `p` or `Enter`
-- Resume: `r` or `Enter`
-- Stop after current step: `s` or `q`
-- Hard stop: `Ctrl+C`
-
-# Unknown Jobs
-
-```powershell
-npm run openUnknownJobs
-npm run unknownJobsUI
-```
-
-# Controller UI
-
-```powershell
-npm run controllerUI
-```
+Do not run these archived commands unless Solomon explicitly approves a separate future workflow.

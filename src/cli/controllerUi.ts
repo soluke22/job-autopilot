@@ -9,11 +9,12 @@ const PORT = 5050;
 const publicDir = path.join(process.cwd(), "static", "controller");
 const indexPath = path.join(publicDir, "index.html");
 const appPath = path.join(publicDir, "app.js");
-const jobsPath = path.join(process.cwd(), "data", "jobs.csv");
+const jobsPath = path.join(process.cwd(), "data", "jobs-raw", "jobs.csv");
 const unknownPath = path.join(process.cwd(), "unknownJobs.js");
-const jobsHeader = "id,source,title,company,location,link,approved,notes";
+const jobsHeader =
+  "id,source,sourceName,sourceType,title,company,location,link,sourceUrl,applyUrl,dateFound,sourceConfidence,approved,manualStatus,notes";
 
-type RunKind = "collect" | "apply" | "idle";
+type RunKind = "collect" | "analyze" | "idle";
 
 let child: ChildProcessWithoutNullStreams | null = null;
 let running = false;
@@ -210,14 +211,14 @@ const server = http.createServer((req, res) => {
       if (!targetUrl) {
         return json(res, 400, { ok: false, error: "URL is required." });
       }
-      const ok = startProcess("run", ["collect:linkedin", "--", `--count=${count}`, `--url=${targetUrl}`], "collect");
+      const ok = startProcess("run", ["collectJobs", "--", `--count=${count}`, `--url=${targetUrl}`], "collect");
       return json(res, 200, { ok });
     });
     return;
   }
 
-  if (req.method === "POST" && url === "/api/apply") {
-    const ok = startProcess("run", ["apply:batch:mac"], "apply");
+  if (req.method === "POST" && url === "/api/analyze") {
+    const ok = startProcess("run", ["analyzeJobs"], "analyze");
     return json(res, 200, { ok });
   }
 

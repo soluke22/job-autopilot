@@ -1,0 +1,204 @@
+{
+  "candidate": {
+    "name": "Solomon Lucas-Thornton",
+    "targetRoleType": "Mid-level frontend-focused Software Engineer",
+    "location": "Germantown, MD",
+    "positioning": "Production React/TypeScript frontend engineer with Disney/ESPN experience across product UI, shared component systems, TypeScript modernization, internal tools, testing, production support, and backend-driven data integration."
+  },
+  "jobTargets": [
+    "Frontend Software Engineer",
+    "React Engineer",
+    "TypeScript Engineer",
+    "UI Platform Engineer",
+    "Design Systems Engineer",
+    "Component Library Engineer",
+    "Product Engineer",
+    "Full-Stack Engineer with frontend emphasis",
+    "Internal Tools Engineer",
+    "Media/sports/consumer web engineer",
+    "AI-assisted frontend engineer"
+  ],
+  "preferences": {
+    "employment": {
+      "preferred": ["full-time"],
+      "avoidUnlessApproved": ["contract", "contract-to-hire", "1099", "C2C"]
+    },
+    "locations": {
+      "preferred": ["remote"],
+      "feasibleHybridRegions": [
+        "Maryland",
+        "MD",
+        "Washington, DC",
+        "District of Columbia",
+        "Northern Virginia",
+        "Virginia",
+        "VA",
+        "Germantown",
+        "Rockville",
+        "Bethesda",
+        "Gaithersburg",
+        "Silver Spring",
+        "Arlington",
+        "Alexandria",
+        "Reston",
+        "McLean",
+        "Tysons",
+        "Fairfax",
+        "Herndon"
+      ],
+      "avoid": ["relocation required", "onsite 5 days", "on-site 5 days", "5 days onsite"]
+    },
+    "seniority": {
+      "targetYearsMin": 3,
+      "targetYearsMax": 6,
+      "stretchYearsMin": 7,
+      "avoidTitles": ["staff", "principal", "manager", "director"]
+    },
+    "clearance": {
+      "avoidActiveClearanceRequired": true,
+      "allowObtainAfterHire": true
+    },
+    "visaSponsorshipFiltering": false
+  },
+  "preferredKeywords": [
+    "React",
+    "TypeScript",
+    "JavaScript",
+    "frontend",
+    "front-end",
+    "UI engineer",
+    "product engineer",
+    "design systems",
+    "component library",
+    "Storybook",
+    "Jest",
+    "Playwright",
+    "React Testing Library",
+    "accessibility",
+    "Figma",
+    "GraphQL",
+    "internal tools",
+    "admin tools",
+    "production support",
+    "media",
+    "sports",
+    "consumer web",
+    "platform UI",
+    "AI-assisted development",
+    "Claude Code",
+    "Codex"
+  ],
+  "cautionKeywords": [
+    "staff",
+    "principal",
+    "manager",
+    "director",
+    "8+ years",
+    "10+ years",
+    "heavy Java backend",
+    "Spring Boot ownership",
+    "Kubernetes-heavy",
+    "AWS infrastructure-heavy",
+    "SRE",
+    "DevOps",
+    "active clearance required",
+    "onsite 5 days",
+    "relocation required",
+    "contract",
+    "1099",
+    "C2C",
+    "unpaid",
+    "commission-only",
+    "mobile-only",
+    "native iOS",
+    "native Android"
+  ],
+  "resumeVariants": [
+    "frontend-product-engineer",
+    "ui-platform-design-systems",
+    "internal-tools-fullstack-frontend",
+    "production-support-frontend",
+    "skip/no resume variant"
+  ],
+  "evidenceBank": [
+    {
+      "id": "wnba-commissioners-cup",
+      "label": "WNBA Commissioner's Cup standings tab",
+      "resumeVariant": "frontend-product-engineer",
+      "keywords": ["React", "JavaScript", "ESPN", "standings", "live data", "accessibility", "metadata", "translation", "sports", "media"],
+      "summary": "Implemented and shipped ESPN's WNBA Commissioner's Cup standings tab in fitt-espn, including React/JavaScript table UI, route/tab-state behavior, live backend data integration, edge-case handling, testing/QA, accessibility checks, and metadata/translation validation."
+    },
+    {
+      "id": "gamecast-redesign",
+      "label": "GameCast redesign",
+      "resumeVariant": "frontend-product-engineer",
+      "keywords": ["React", "ESPN", "GameCast", "consumer web", "product UI", "design collaboration", "backend collaboration", "game switcher"],
+      "summary": "Shipped production ESPN GameCast redesign work in fitt-espn, resolving SEWEB frontend UI tickets, collaborating with design and backend teams, and delivering a game switcher solution through iterative feedback."
+    },
+    {
+      "id": "crossover-components",
+      "label": "crossover shared component repository",
+      "resumeVariant": "ui-platform-design-systems",
+      "keywords": ["React", "TypeScript", "component library", "design systems", "Storybook", "React Testing Library", "Jest", "design tokens", "accessibility", "Button", "Pressable", "Carousel", "TextInput", "Skeleton"],
+      "summary": "Built and merged reusable React/TypeScript components in Disney's shared component repository, including Button, Pressable, CarouselLRD, TextInput, and Skeleton-related work with Storybook, React Testing Library/Jest, design-token styling, prop pass-through fixes, and TV/LRD-focused interaction states."
+    },
+    {
+      "id": "fitt-v3-typescript",
+      "label": "FITT v3 TypeScript modernization",
+      "resumeVariant": "ui-platform-design-systems",
+      "keywords": ["TypeScript", "modernization", "shared frontend systems", "utilities", "formatting helpers", "Disney", "ESPN"],
+      "summary": "Contributed to FITT v3 / Fitt Core modernization by converting legacy JavaScript modules, utility functions, and formatting helpers to TypeScript in shared Disney/ESPN frontend systems."
+    },
+    {
+      "id": "espn-production-support",
+      "label": "ESPN production support",
+      "resumeVariant": "production-support-frontend",
+      "keywords": ["production support", "triage", "New Relic", "alerts", "debugging", "platform teams", "CTOI", "frontend support"],
+      "summary": "Supported ESPN production-support rotation by triaging CTOI bugs, investigating New Relic/request-path alerts, validating affected pages, and coordinating escalation across Ads, Client API, and platform teams."
+    },
+    {
+      "id": "espnadmin-internal-tools",
+      "label": "espnadmin internal tooling",
+      "resumeVariant": "internal-tools-fullstack-frontend",
+      "keywords": ["internal tools", "admin tools", "workflow", "legacy JavaScript", "NBA Draft", "save flow", "redirect behavior", "shift trade"],
+      "summary": "Delivered shipped espnadmin internal-tool changes for NBA Draft workflows and late-shift communication / shift-trade coordination, implementing legacy JavaScript save-flow and redirect behavior after reviewing UX tradeoffs and backend data concerns."
+    }
+  ],
+  "unsupportedClaims": [
+    "led Disney frontend modernization",
+    "architected Disney's design system",
+    "owned crossover",
+    "led TypeScript migration",
+    "built backend systems",
+    "quantified engagement, performance, defect, backlog, or scale metrics",
+    "management experience"
+  ],
+  "scoringWeights": {
+    "targetTitle": 22,
+    "frontendTitle": 14,
+    "react": 15,
+    "typescript": 15,
+    "javascript": 8,
+    "testingOrAccessibility": 8,
+    "designSystems": 12,
+    "internalTools": 10,
+    "mediaSportsConsumer": 8,
+    "aiAssistedFrontend": 6,
+    "fullTime": 8,
+    "remoteOrFeasibleHybrid": 10,
+    "midLevel": 8,
+    "evidenceMatch": 12,
+    "backendHeavyPenalty": -24,
+    "infrastructureHeavyPenalty": -30,
+    "seniorStretchPenalty": -12,
+    "unclearPenalty": -5
+  },
+  "safety": {
+    "allowApplyAutomationDefault": false,
+    "allowGmailDraftsDefault": false,
+    "allowRecruiterMessagingDefault": false,
+    "requiredApplyFlag": "--i-understand-this-will-apply",
+    "requiredGmailDraftFlag": "--i-understand-this-will-create-gmail-drafts",
+    "requiredRecruiterMessagingFlag": "--i-understand-this-will-message-recruiters"
+  }
+}

@@ -1,6 +1,7 @@
 import { Page, Locator } from "playwright";
 import * as os from "os";
 import { Profile } from "../utils/config";
+import { assertApplyAutomationAllowed } from "../utils/safety";
 
 // Track which question blocks we've already interacted with to prevent double-clicking
 const answeredQuestionBlocks = new Set<string>();
@@ -499,6 +500,7 @@ async function defaultAnyUnansweredYesNoToYes(page: Page) {
 }
 
 export async function autofillAshby(page: Page, profile: Profile) {
+  assertApplyAutomationAllowed();
   // 1) Force /application route
   const cur = page.url();
   const appUrl = toAshbyApplicationUrl(cur);

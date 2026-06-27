@@ -1,7 +1,9 @@
-import { chromium } from "playwright";
+import { chromium, Page } from "playwright";
 import * as fs from "fs";
 import * as path from "path";
-import { loadProfile } from "../utils/config";
+import { CsvRow, readCsv, writeCsv } from "../utils/csv";
+import { loadSolomonProfile } from "../utils/solomonProfile";
+import { RAW_JOB_HEADERS } from "../sources/collection";
 
 type JobRow = {
   title: string;
@@ -10,166 +12,54 @@ type JobRow = {
   link: string;
 };
 
+const HEADERS = RAW_JOB_HEADERS;
+
 function getArg(name: string): string | null {
-  const hit = process.argv.find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
+  const hit = process.argv.find((arg) => arg === `--${name}` || arg.startsWith(`--${name}=`));
   if (!hit) return null;
-
   if (hit.includes("=")) return hit.split("=").slice(1).join("=");
-
   const idx = process.argv.indexOf(hit);
   return process.argv[idx + 1] ?? null;
 }
 
-function csvEscape(value: string): string {
-  const v = (value ?? "").toString();
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
-  return v;
-}
-
-function writeCsv(filePath: string, rows: Record<string, string>[], headers: string[]) {
-  const lines: string[] = [];
-  lines.push(headers.join(","));
-  for (const r of rows) {
-    lines.push(headers.map((h) => csvEscape(r[h] ?? "")).join(","));
-  }
-  fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
-}
-
-function parseFirstCsvField(line: string): string {
-  const trimmed = line.trim();
-  if (!trimmed) return "";
-  if (!trimmed.startsWith('"')) {
-    const idx = trimmed.indexOf(",");
-    return idx === -1 ? trimmed : trimmed.slice(0, idx);
-  }
-  let i = 1;
-  let out = "";
-  while (i < trimmed.length) {
-    const ch = trimmed[i];
-    if (ch === '"') {
-      if (trimmed[i + 1] === '"') {
-        out += '"';
-        i += 2;
-        continue;
-      }
-      break;
-    }
-    out += ch;
-    i += 1;
-  }
-  return out;
-}
-
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i += 1;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        cur += ch;
-      }
-      continue;
-    }
-    if (ch === '"') {
-      inQuotes = true;
-      continue;
-    }
-    if (ch === ",") {
-      out.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  out.push(cur);
-  return out;
-}
-
-function getNextId(filePath: string, headers: string[]): number {
-  if (!fs.existsSync(filePath)) return 1;
-  const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) return 1;
-  if (lines[0].trim() !== headers.join(",")) return 1;
-
-  let maxId = 0;
-  for (let i = 1; i < lines.length; i++) {
-    const first = parseFirstCsvField(lines[i]);
-    const num = parseInt(first, 10);
-    if (!Number.isNaN(num)) maxId = Math.max(maxId, num);
-  }
-  return maxId + 1;
-}
-
-function getExistingLinks(filePath: string, headers: string[]): Set<string> {
-  const links = new Set<string>();
-  if (!fs.existsSync(filePath)) return links;
-  const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) return links;
-  if (lines[0].trim() !== headers.join(",")) return links;
-
-  const linkIndex = headers.indexOf("link");
-  if (linkIndex === -1) return links;
-
-  for (let i = 1; i < lines.length; i++) {
-    const fields = parseCsvLine(lines[i]);
-    const link = (fields[linkIndex] ?? "").trim();
-    if (link) links.add(link);
-  }
-  return links;
-}
-
-function appendCsv(filePath: string, rows: Record<string, string>[], headers: string[]) {
-  if (!fs.existsSync(filePath)) {
-    writeCsv(filePath, rows, headers);
-    return;
-  }
-  const content = fs.readFileSync(filePath, "utf-8");
-  const hasHeader = content.split(/\r?\n/)[0]?.trim() === headers.join(",");
-  const lines: string[] = [];
-  if (!hasHeader) {
-    lines.push(headers.join(","));
-  }
-  for (const r of rows) {
-    lines.push(headers.map((h) => csvEscape(r[h] ?? "")).join(","));
-  }
-  const prefix = content.endsWith("\n") || content.length === 0 ? "" : "\n";
-  fs.appendFileSync(filePath, prefix + lines.join("\n"), "utf-8");
-}
-
-function normalizeCompanyForMatch(value: string): string {
-  return (value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+function normalizeCompanyForMatch(value: string) {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function loadCompanyBlacklist(filePath: string): string[] {
   if (!fs.existsSync(filePath)) return [];
-  const raw = fs.readFileSync(filePath, "utf-8");
-  return raw
+  return fs
+    .readFileSync(filePath, "utf8")
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith("#"));
 }
 
-function isBlacklistedCompany(company: string, blacklist: string[]): boolean {
+function isBlacklistedCompany(company: string, blacklist: string[]) {
   const normalized = normalizeCompanyForMatch(company);
-  if (!normalized) return false;
-  return blacklist.some((blocked) => normalized.includes(normalizeCompanyForMatch(blocked)));
+  return !!normalized && blacklist.some((blocked) => normalized.includes(normalizeCompanyForMatch(blocked)));
 }
 
-async function autoScroll(page: any, times: number) {
-  for (let i = 0; i < times; i++) {
+function getNextId(rows: CsvRow[]) {
+  return (
+    rows.reduce((max, row) => {
+      const value = Number.parseInt(row.id ?? "", 10);
+      return Number.isNaN(value) ? max : Math.max(max, value);
+    }, 0) + 1
+  );
+}
+
+function getExistingLinks(rows: CsvRow[]) {
+  return new Set(rows.map((row) => row.link || row.sourceUrl || row.applyUrl).filter(Boolean));
+}
+
+function readExistingRows(filePath: string) {
+  if (!fs.existsSync(filePath)) return [];
+  return readCsv(filePath);
+}
+
+async function autoScroll(page: Page, times: number) {
+  for (let i = 0; i < times; i += 1) {
     const didScroll = await page.evaluate(() => {
       const isScrollable = (el: HTMLElement | null) => {
         if (!el) return false;
@@ -193,18 +83,14 @@ async function autoScroll(page: any, times: number) {
         (document.querySelector("div.job-card-container") as HTMLElement | null) ||
         (document.querySelector("li[data-occludable-job-id]") as HTMLElement | null);
 
-      let target = findScrollableParent(card);
+      const list =
+        (document.querySelector("ul.jobs-search__results-list") as HTMLElement | null) ||
+        (document.querySelector("div.jobs-search-results-list") as HTMLElement | null) ||
+        (document.querySelector("div.jobs-search__results-list") as HTMLElement | null) ||
+        (document.querySelector("div.scaffold-layout__list") as HTMLElement | null) ||
+        (document.querySelector("div.scaffold-layout__list-container") as HTMLElement | null);
 
-      if (!target) {
-        const list =
-          (document.querySelector("ul.jobs-search__results-list") as HTMLElement | null) ||
-          (document.querySelector("div.jobs-search-results-list") as HTMLElement | null) ||
-          (document.querySelector("div.jobs-search__results-list") as HTMLElement | null) ||
-          (document.querySelector("div.scaffold-layout__list") as HTMLElement | null) ||
-          (document.querySelector("div.scaffold-layout__list-container") as HTMLElement | null);
-        target = findScrollableParent(list);
-      }
-
+      const target = findScrollableParent(card) ?? findScrollableParent(list);
       if (target && target.scrollHeight > target.clientHeight) {
         const before = target.scrollTop;
         target.scrollTop = before + target.clientHeight * 0.9;
@@ -223,74 +109,39 @@ async function autoScroll(page: any, times: number) {
   }
 }
 
-async function extractJobs(page: any): Promise<JobRow[]> {
+async function extractJobs(page: Page): Promise<JobRow[]> {
   return page.evaluate(() => {
-    // Grab anchors that point to job view pages
     const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href*='/jobs/view/']"));
-
     const normalize = (href: string) => {
-      // remove tracking params for uniqueness
       try {
-        const u = new URL(href);
-        u.search = "";
-        return u.toString();
+        const url = new URL(href);
+        url.search = "";
+        url.hash = "";
+        return url.toString();
       } catch {
         return href;
       }
     };
-
+    const text = (el: Element | null | undefined) => (el as HTMLElement | null)?.innerText?.trim() ?? "";
     const seen = new Set<string>();
     const rows: JobRow[] = [];
 
-    const isEasyApply = (card: Element | null | undefined) => {
-      if (!card) return false;
-
-      const selectors = [
-        "[aria-label*='Easy Apply' i]",
-        "button[aria-label*='Easy Apply' i]",
-        "a[aria-label*='Easy Apply' i]",
-        ".job-card-container__apply-method",
-        ".job-card-list__apply-method",
-        ".job-card-container__footer-item",
-        ".job-card-container__footer-items",
-        ".job-card-list__footer",
-        ".job-card-container__metadata-item",
-        ".job-card-container__metadata-wrapper"
-      ];
-
-      const nodes = card.querySelectorAll(selectors.join(","));
-      for (const node of nodes) {
-        const text = (node as HTMLElement).innerText ?? "";
-        if (/easy apply/i.test(text)) return true;
-      }
-
-      return false;
-    };
-
-    for (const a of anchors) {
-      const hrefRaw = a.href;
-      if (!hrefRaw) continue;
-
-      const href = normalize(hrefRaw);
-      if (seen.has(href)) continue;
+    for (const anchor of anchors) {
+      const href = normalize(anchor.href);
+      if (!href || seen.has(href)) continue;
       seen.add(href);
 
-      // Job card container is often an <li> in results list
       const card =
-        a.closest("li") ||
-        a.closest("div.jobs-search-results__list-item") ||
-        a.closest("div.job-card-container") ||
-        a.parentElement;
-
-      if (isEasyApply(card)) continue;
-
-      const text = (el: Element | null | undefined) => (el as HTMLElement | null)?.innerText?.trim() ?? "";
+        anchor.closest("li") ||
+        anchor.closest("div.jobs-search-results__list-item") ||
+        anchor.closest("div.job-card-container") ||
+        anchor.parentElement;
 
       const title =
         text(card?.querySelector("span[aria-hidden='true']")) ||
         text(card?.querySelector("a.job-card-list__title")) ||
         text(card?.querySelector("h3")) ||
-        text(a);
+        text(anchor);
 
       const company =
         text(card?.querySelector(".job-card-container__primary-description")) ||
@@ -314,264 +165,134 @@ async function extractJobs(page: any): Promise<JobRow[]> {
   });
 }
 
-function normalizeSearchUrl(inputUrl: string): string {
-  try {
-    const u = new URL(inputUrl);
-    if (u.searchParams.has("f_AL")) {
-      u.searchParams.delete("f_AL");
-      return u.toString();
+function capByRoleAndCompany(items: JobRow[], maxPerKey: number) {
+  const counts = new Map<string, number>();
+  const out: JobRow[] = [];
+  const norm = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
+
+  for (const item of items) {
+    const key = `${norm(item.title || "")}@@${norm(item.company || "")}`;
+    if (key === "@@") {
+      out.push(item);
+      continue;
     }
-    return inputUrl;
-  } catch {
-    return inputUrl;
+    const next = (counts.get(key) ?? 0) + 1;
+    counts.set(key, next);
+    if (next <= maxPerKey) out.push(item);
   }
+  return out;
 }
 
 async function main() {
-  loadProfile();
+  loadSolomonProfile();
 
-  const countStr = getArg("count") ?? "10";
-  const count = Math.max(1, parseInt(countStr, 10) || 10);
-
-  const rawUrl =
+  const count = Math.max(1, Number.parseInt(getArg("count") ?? "10", 10) || 10);
+  const url =
     getArg("url") ??
-    "https://www.linkedin.com/jobs/search/?keywords=frontend%20engineer&location=United%20States";
-  const url = normalizeSearchUrl(rawUrl);
+    "https://www.linkedin.com/jobs/search/?keywords=frontend%20engineer%20react%20typescript&location=United%20States&f_JT=F";
 
   const storagePath = path.join(process.cwd(), "storage", "linkedin.json");
   if (!fs.existsSync(storagePath)) {
-    throw new Error(`LinkedIn session not found. Run: npm run auth:linkedin`);
+    throw new Error(`LinkedIn session not found. Run: npm run authLinkedIn`);
   }
 
-  const outPath = path.join(process.cwd(), "data", "jobs.csv");
   const dataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  const rawJobsDir = path.join(dataDir, "jobs-raw");
+  fs.mkdirSync(rawJobsDir, { recursive: true });
+  const outPath = path.join(rawJobsDir, "jobs.csv");
   const blacklistPath = path.join(dataDir, "blacklist-companies.txt");
   const companyBlacklist = loadCompanyBlacklist(blacklistPath);
+  const existingRows = readExistingRows(outPath);
+  const existingLinks = getExistingLinks(existingRows);
+  const nextId = getNextId(existingRows);
 
-  console.log("Launching browser...");
+  console.log("Launching browser for read-only LinkedIn collection...");
   const browser = await chromium.launch({ headless: false, slowMo: 10 });
   const context = await browser.newContext({ storageState: storagePath });
   const page = await context.newPage();
 
   console.log("Going to URL:");
   console.log(url);
-  if (rawUrl !== url) {
-    console.log("Adjusted URL to avoid Easy Apply filter (removed f_AL).");
-  }
   await page.goto(url, { waitUntil: "domcontentloaded" });
-
-  console.log("Waiting for job results to appear...");
-  // LinkedIn changes markup often; try a few known containers
   await page.waitForTimeout(2000);
 
-  // If redirected to login, session failed
-  const currentUrl = page.url();
-  if (currentUrl.includes("/login")) {
-    throw new Error("Redirected to LinkedIn login. Re-run: npm run auth:linkedin");
+  if (page.url().includes("/login")) {
+    throw new Error("Redirected to LinkedIn login. Re-run: npm run authLinkedIn");
   }
 
-  // Try to wait for any of these selectors
   const possibleSelectors = [
     "ul.jobs-search__results-list",
     "div.jobs-search-results-list",
     "div.scaffold-layout__list",
     "main"
   ];
-
-  let found = false;
-  for (const sel of possibleSelectors) {
+  for (const selector of possibleSelectors) {
     try {
-      await page.waitForSelector(sel, { timeout: 8000 });
-      console.log(`Found results container: ${sel}`);
-      found = true;
+      await page.waitForSelector(selector, { timeout: 6000 });
+      console.log(`Found results container: ${selector}`);
       break;
     } catch {}
   }
 
-  if (!found) {
-    console.log("⚠️ Could not confidently find the results container.");
-    console.log("We will still attempt to scrape /jobs/view links from the page.");
-  }
-
-  const maxScrolls = 60;
-  const initialScrolls = 10;
-  const scrollChunk = 3;
-  const maxPages = 50;
-  const pageSize = 25;
-  const headers = ["id", "source", "title", "company", "location", "link", "approved", "notes"];
-  const existingLinks = getExistingLinks(outPath, headers);
-  const nextId = getNextId(outPath, headers);
-
-  console.log("Scrolling to load job cards...");
-  let jobs: JobRow[] = [];
+  const jobs: JobRow[] = [];
   const seen = new Set<string>();
   let blacklistedSkipped = 0;
+  let totalScrolls = 0;
+  let noProgressStreak = 0;
 
-  const collectFromCurrentPage = async (pageLabel: string) => {
-    let totalScrolls = 0;
-    let noProgressStreak = 0;
+  while (jobs.length < count && totalScrolls < 80 && noProgressStreak < 5) {
+    const before = jobs.length;
+    await autoScroll(page, totalScrolls === 0 ? 10 : 4);
+    totalScrolls += totalScrolls === 0 ? 10 : 4;
 
-    while (jobs.length < count && totalScrolls < maxScrolls && noProgressStreak < 3) {
-      const nextScrolls = totalScrolls === 0 ? initialScrolls : scrollChunk;
-      await autoScroll(page, nextScrolls);
-      totalScrolls += nextScrolls;
-
-      const before = jobs.length;
-      const batch = await extractJobs(page);
-      for (const j of batch) {
-        if (!j.link || !j.link.includes("/jobs/view/")) continue;
-        if (seen.has(j.link)) continue;
-        seen.add(j.link);
-        if (isBlacklistedCompany(j.company || "", companyBlacklist)) {
-          blacklistedSkipped += 1;
-          continue;
-        }
-        jobs.push(j);
-      }
-
-      noProgressStreak = jobs.length === before ? noProgressStreak + 1 : 0;
-
-      console.log(
-        `Collected ${jobs.length}/${count} non-Easy Apply jobs after ${totalScrolls} scrolls on ${pageLabel}.`
-      );
-    }
-  };
-
-  await collectFromCurrentPage("page 1");
-
-  const baseUrl = (() => {
-    try {
-      const u = new URL(url);
-      u.searchParams.delete("start");
-      return u;
-    } catch {
-      return null;
-    }
-  })();
-
-  if (baseUrl === null) {
-    console.log("Skipping pagination: URL could not be parsed.");
-  } else {
-    let zeroGainPages = 0;
-    for (let pageIndex = 1; jobs.length < count && pageIndex < maxPages; pageIndex++) {
-      const pageUrl = new URL(baseUrl.toString());
-      pageUrl.searchParams.set("start", String(pageIndex * pageSize));
-
-      console.log(`Navigating to page ${pageIndex + 1}...`);
-      await page.goto(pageUrl.toString(), { waitUntil: "domcontentloaded" });
-
-      console.log("Waiting for job results to appear...");
-      // LinkedIn changes markup often; try a few known containers
-      await page.waitForTimeout(2000);
-
-      // If redirected to login, session failed
-      const currentUrl = page.url();
-      if (currentUrl.includes("/login")) {
-        throw new Error("Redirected to LinkedIn login. Re-run: npm run auth:linkedin");
-      }
-
-      // Try to wait for any of these selectors
-      const possibleSelectors = [
-        "ul.jobs-search__results-list",
-        "div.jobs-search-results-list",
-        "div.scaffold-layout__list",
-        "main"
-      ];
-
-      let found = false;
-      for (const sel of possibleSelectors) {
-        try {
-          await page.waitForSelector(sel, { timeout: 8000 });
-          console.log(`Found results container: ${sel}`);
-          found = true;
-          break;
-        } catch {}
-      }
-
-      if (!found) {
-        console.log("ƒsÿ‹,? Could not confidently find the results container.");
-        console.log("We will still attempt to scrape /jobs/view links from the page.");
-      }
-
-      const beforePage = jobs.length;
-      await collectFromCurrentPage(`page ${pageIndex + 1}`);
-      if (jobs.length === beforePage) {
-        zeroGainPages += 1;
-      } else {
-        zeroGainPages = 0;
-      }
-      if (zeroGainPages >= 10) {
-        console.log("No new jobs found for 10 pages. Stopping pagination.");
-        break;
-      }
-    }
-  }
-
-  console.log(`Raw extracted job links (non-Easy Apply): ${jobs.length}`);
-  if (blacklistedSkipped > 0) {
-    const labels = companyBlacklist.length > 0 ? companyBlacklist.join(", ") : "none";
-    console.log(`Skipped ${blacklistedSkipped} jobs due to company blacklist (${labels}).`);
-  }
-  if (companyBlacklist.length === 0) {
-    console.log(`No company blacklist loaded. Add names in: ${blacklistPath}`);
-  }
-
-  const capByRoleAndCompany = (items: JobRow[], maxPerKey: number) => {
-    const counts = new Map<string, number>();
-    const out: JobRow[] = [];
-    const norm = (v: string) => v.toLowerCase().replace(/\s+/g, " ").trim();
-
-    for (const item of items) {
-      const title = norm(item.title || "");
-      const company = norm(item.company || "");
-      if (!title || !company) {
-        out.push(item);
+    const batch = await extractJobs(page);
+    for (const job of batch) {
+      if (!job.link || seen.has(job.link)) continue;
+      seen.add(job.link);
+      if (isBlacklistedCompany(job.company || "", companyBlacklist)) {
+        blacklistedSkipped += 1;
         continue;
       }
-      const key = `${title}@@${company}`;
-      const next = (counts.get(key) ?? 0) + 1;
-      counts.set(key, next);
-      if (next <= maxPerKey) {
-        out.push(item);
-      }
+      jobs.push(job);
     }
-    return out;
-  };
 
-  const capped = capByRoleAndCompany(jobs, 2);
-  if (capped.length !== jobs.length) {
-    console.log(
-      `Skipped ${jobs.length - capped.length} duplicate role/company entries (kept up to 2 per role+company).`
-    );
+    noProgressStreak = jobs.length === before ? noProgressStreak + 1 : 0;
+    console.log(`Collected ${jobs.length}/${count} job links after ${totalScrolls} scrolls.`);
   }
 
-  const trimmed = capped.slice(0, count);
-
-  console.log(`Using first ${trimmed.length} jobs (requested ${count}).`);
-
-  const rowsForCsv = trimmed
-    .filter((j) => !existingLinks.has(j.link))
-    .map((j, idx) => ({
-      id: String(nextId + idx),
+  const capped = capByRoleAndCompany(jobs, 2).slice(0, count);
+  const today = new Date().toISOString().slice(0, 10);
+  const rowsForCsv = capped
+    .filter((job) => !existingLinks.has(job.link))
+    .map((job, index) => ({
+      id: String(nextId + index),
       source: "linkedin",
-      title: j.title || "",
-      company: j.company || "",
-      location: j.location || "",
-      link: j.link,
-      approved: "true",
-      notes: ""
+      sourceName: "linkedin",
+      sourceType: "linkedIn",
+      title: job.title || "",
+      company: job.company || "",
+      location: job.location || "",
+      link: job.link,
+      sourceUrl: job.link,
+      applyUrl: job.link,
+      dateFound: today,
+      sourceConfidence: "medium",
+      approved: "false",
+      manualStatus: "unreviewed",
+      notes: "discovery-only; review manually"
     }));
 
-  appendCsv(outPath, rowsForCsv, headers);
+  writeCsv(outPath, [...existingRows, ...rowsForCsv], HEADERS);
 
-  console.log(`✅ Wrote CSV: ${outPath}`);
-  console.log("Open data/jobs.csv to review. Mark approved=true to apply later.");
+  console.log(`Raw extracted job links: ${jobs.length}`);
+  if (blacklistedSkipped > 0) console.log(`Skipped ${blacklistedSkipped} jobs due to company blacklist.`);
+  console.log(`Wrote CSV: ${outPath}`);
+  console.log("Discovery-only collection complete. Review, analyze, and apply manually outside this tool.");
 
   await browser.close();
 }
 
-main().catch((err) => {
-  console.error("❌ collect:linkedin failed:", err);
+main().catch((error) => {
+  console.error("collectJobs failed:", error);
   process.exit(1);
 });

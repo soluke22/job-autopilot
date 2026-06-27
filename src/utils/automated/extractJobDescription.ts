@@ -95,7 +95,15 @@ function extractSkills(text: string) {
     "Playwright",
     "Redis",
     "Kafka",
-    "Microservices"
+    "Microservices",
+    "Storybook",
+    "React Testing Library",
+    "Accessibility",
+    "Figma",
+    "Design Systems",
+    "Component Library",
+    "Claude Code",
+    "Codex"
   ];
 
   const found = knownSkills.filter((skill) => new RegExp(`\\b${skill.replace(/[.+]/g, "\\$&")}\\b`, "i").test(text));
@@ -150,21 +158,29 @@ export async function extractJobDescription(page: Page): Promise<StructuredJobDe
 
     const clean = (value: string) => value.replace(/\s+/g, " ").trim();
 
-    const title =
-      pickText([
-        "h1",
-        "[data-testid='job-details-title']",
-        ".job-details-jobs-unified-top-card__job-title",
-        ".t-24.job-details-jobs-unified-top-card__job-title"
-      ]) || "";
+      const title =
+        pickText([
+          "h1",
+          "[data-testid='job-details-title']",
+          "[data-testid='job-title']",
+          ".posting-headline h2",
+          ".app-title",
+          ".ashby-job-posting-heading",
+          ".job-details-jobs-unified-top-card__job-title",
+          ".t-24.job-details-jobs-unified-top-card__job-title"
+        ]) || "";
 
-    const company =
-      pickText([
-        "[data-testid='company-name']",
-        ".job-details-jobs-unified-top-card__company-name a",
-        ".job-details-jobs-unified-top-card__company-name",
-        ".job-details-jobs-unified-top-card__primary-description-container a"
-      ]) || "";
+      const company =
+        pickText([
+          "[data-testid='company-name']",
+          "[data-testid='company']",
+          ".company-name",
+          ".posting-company",
+          ".ashby-job-posting-brief",
+          ".job-details-jobs-unified-top-card__company-name a",
+          ".job-details-jobs-unified-top-card__company-name",
+          ".job-details-jobs-unified-top-card__primary-description-container a"
+        ]) || "";
 
     let location = "";
     const topMeta = document.querySelector(
@@ -194,14 +210,20 @@ export async function extractJobDescription(page: Page): Promise<StructuredJobDe
       }
     }
 
-    if (!description) {
-      const descriptionSelectors = [
-        "[data-testid='job-details-description']",
-        "[data-testid='job-description']",
-        ".jobs-description",
-        ".job-view-layout.jobs-details",
-        "main"
-      ];
+      if (!description) {
+        const descriptionSelectors = [
+          "[data-testid='job-details-description']",
+          "[data-testid='job-description']",
+          "[data-testid='job-posting-description']",
+          ".posting-page",
+          ".posting",
+          ".section-wrapper",
+          "#content",
+          "#app_body",
+          ".jobs-description",
+          ".job-view-layout.jobs-details",
+          "main"
+        ];
 
       for (const selector of descriptionSelectors) {
         const element = document.querySelector(selector) as HTMLElement | null;

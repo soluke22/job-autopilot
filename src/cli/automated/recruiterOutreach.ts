@@ -3,6 +3,7 @@ import path from "path";
 import { chromium, Locator, Page } from "playwright";
 import { getRecruiterOutreachPath, readRecruiterOutreach } from "../../utils/automated/recruiterOutreach";
 import { loadProfile } from "../../utils/config";
+import { assertRecruiterMessagingAllowed } from "../../utils/safety";
 
 const PROFILE_READY_TIMEOUT_MS = 20000;
 const INVITE_DIALOG_TIMEOUT_MS = 10000;
@@ -1012,6 +1013,7 @@ function waitForEnter(prompt: string): Promise<void> {
 }
 
 async function sendPreparedNotes(pages: Page[], delaySeconds: number) {
+  assertRecruiterMessagingAllowed();
   console.log(`\nStarting send - ${delaySeconds}s delay between each...\n`);
   let sent = 0;
 
@@ -1103,6 +1105,7 @@ async function findManuallyPreparedPages(manualReviewPages: ManualReviewPage[]) 
 }
 
 async function main() {
+  assertRecruiterMessagingAllowed();
   const groups = readRecruiterOutreach();
   if (groups.length === 0) {
     console.log(`No recruiter outreach entries found in ${getRecruiterOutreachPath()}`);

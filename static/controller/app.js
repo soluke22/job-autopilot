@@ -1,7 +1,7 @@
 const logEl = document.getElementById("log");
 const statusEl = document.getElementById("status");
 const collectBtn = document.getElementById("collectBtn");
-const applyBtn = document.getElementById("applyBtn");
+const analyzeBtn = document.getElementById("analyzeBtn");
 const clearJobsBtn = document.getElementById("clearJobs");
 const clearUnknownBtn = document.getElementById("clearUnknown");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -29,17 +29,13 @@ async function refreshStatus() {
   } else {
     statusEl.textContent = `Status: ${s.runKind}${s.running ? " (running)" : " (idle)"}`;
   }
-  if (!s.running && (s.lastCollectCompleted || s.hasJobs)) {
-    applyBtn.style.display = "inline-block";
-  } else if (!s.running) {
-    applyBtn.style.display = "none";
-  }
+  analyzeBtn.style.display = !s.running && (s.lastCollectCompleted || s.hasJobs) ? "inline-block" : "none";
   if (s.running) {
     collectBtn.disabled = true;
-    applyBtn.disabled = true;
+    analyzeBtn.disabled = true;
   } else {
     collectBtn.disabled = false;
-    applyBtn.disabled = false;
+    analyzeBtn.disabled = false;
   }
 }
 
@@ -68,8 +64,8 @@ collectBtn.addEventListener("click", async () => {
   await refreshStatus();
 });
 
-applyBtn.addEventListener("click", async () => {
-  await fetch("/api/apply", { method: "POST" });
+analyzeBtn.addEventListener("click", async () => {
+  await fetch("/api/analyze", { method: "POST" });
   await refreshStatus();
 });
 

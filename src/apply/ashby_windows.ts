@@ -1,5 +1,6 @@
 import { Page, Locator } from "playwright";
 import { Profile } from "../utils/config";
+import { assertApplyAutomationAllowed } from "../utils/safety";
 
 function escapeRegex(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -392,6 +393,7 @@ async function defaultAnyUnansweredYesNoToYes(page: Page) {
 }
 
 export async function autofillAshby(page: Page, profile: Profile) {
+  assertApplyAutomationAllowed();
   const cur = page.url();
   const appUrl = toAshbyApplicationUrl(cur);
 

@@ -6,8 +6,10 @@ import { extractJobDescription } from "../../utils/automated/extractJobDescripti
 import { generateOutreachEmail } from "../../utils/automated/openai";
 import { createGmailDraft } from "../../utils/gmail";
 import { buildEmailBody, buildSubject } from "../../utils/outreachEmail";
+import { assertGmailDraftsAllowed } from "../../utils/safety";
 
 async function main() {
+  assertGmailDraftsAllowed();
   const urls = readOutReachJobs();
   if (urls.length === 0) {
     console.log(`No outreach URLs found in ${getOutReachJobsPath()}`);

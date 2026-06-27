@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Job Autopilot Controller</title>
+    <title>Job Radar Controller</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; color: #222; }
       h1 { margin: 0 0 12px; font-size: 20px; }
       .grid { display: grid; gap: 12px; }
-      .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 14px; }
       label { display: block; margin-bottom: 6px; font-weight: 600; }
       input[type="text"], input[type="number"] { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
       .row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; }
       .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-      button { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; }
+      button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer; }
       button.primary { background: #e3f2fd; border-color: #bbdefb; }
       button.warn { background: #fff3e0; border-color: #ffe0b2; }
       button.danger { background: #ffebee; border-color: #ffcdd2; }
@@ -27,7 +27,7 @@
     </style>
   </head>
   <body>
-    <h1>Job Autopilot Controller</h1>
+    <h1>Job Radar Controller</h1>
     <div class="grid">
       <div class="card">
         <label for="url">LinkedIn URL</label>
@@ -42,7 +42,7 @@
           </div>
         </div>
         <div class="actions" style="margin-top: 12px;">
-          <button id="applyBtn" class="success" style="display:none;">Apply</button>
+          <button id="analyzeBtn" class="success" style="display:none;">Analyze</button>
           <button id="clearJobs" class="warn">Clear Jobs CSV</button>
           <button id="clearUnknown" class="warn">Clear Unknown Jobs JSON</button>
         </div>
